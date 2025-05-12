@@ -1,21 +1,19 @@
-#precisa mudar o esquema do menu, tornar um menu duplo, uma parte para os produtos brutos e outra parte para o produto final
-#bom deixar um espaço separado p/ o menu de estatística 
-#preciso implementar uma medida para que os preços no bd não fiquem diferentes
-    
+#criar o esquema de orientação a objetos, dividir o código em funções e menu
+#Criar menu de gerenciamento de produto final
 
 import sqlite3
 from os import system, name
 
-con = sqlite3.connect('produtos.db')
+con = sqlite3.connect('produtos.db') #Se conecta com o BD e inicia o cursor
 cur = con.cursor()
 
 cur.execute('''
-    CREATE TABLE IF NOT EXISTS produtos (
+    CREATE TABLE IF NOT EXISTS produtos (   
         id INTEGER PRIMARY KEY, 
         nome VARCHAR(20), 
         quantidade INTEGER
     )
-''')
+''') #cria a tabela produtos com as colunas id, nome, quantidade
 
 cur.execute('''
     CREATE TABLE IF NOT EXISTS financeiro (
@@ -24,7 +22,7 @@ cur.execute('''
         preço_total FLOAT,
         FOREIGN KEY (produto_id) REFERENCES produtos(id)
     )
-''')
+''') #cria a tabela financeiro com as colunas produto_id (que está ligada ao id do produto), preço_unitario e preço_total
 
 cur.execute('''
     CREATE TABLE IF NOT EXISTS produto_final(
@@ -33,40 +31,34 @@ cur.execute('''
         quantidade INTEGER,
         preço FLOAT                
     )         
+''') #cria a tabela produto_final com as colunas produto_final_id, nome_produto_final, quantidade e preço
+
+cur.execute('''
+    CREATE TABLE IF NOT EXISTS controle_de_receita(
+            receitas VARCHAR(30),
+            preço_receitas FLOAT
+            )            
 ''')
 
-
-
-con.commit()
-
-def funcao_select(tabela, coluna=None, valor=None, cond_extra=None, valor_extra=None):
-    query = f"SELECT * FROM {tabela}" 
-
-    parametros = []
-
-    if coluna and valor is not None:
-        query += f" WHERE {coluna} = ?"
-        parametros.append(valor)
-
-        if cond_extra and valor_extra is not None:
-            query += f" AND {cond_extra} = ?"
-            parametros.append(valor_extra)
-
-    cur.execute(query, parametros)
-    resultado_funcao = cur.fetchall()
-    print(resultado_funcao)
+cur.execute('''
+    CREATE TABLE IF NOT EXISTS controle_de_despesas(
+            despesas VARCHAR(30),
+            preço_despesas FLOAT
+            )            
+''') 
+con.commit() #salva as alterações no bd
 
 
 
 
-def escolha_uma_opcao():
+def escolha_uma_opcao(): #cria um visual pro menu ficar mais estético
     print(f'{20 * "-="}')
     print(f"{10 * ' '}Escolha uma opção")
     print(f'{20 * "-="}')
 
 
 
-def limpar_tela():
+def limpar_tela(): #é responsável por limpar a tela dps de uma interação com o menu
     system('cls' if name == 'nt' else 'clear')
     
 
@@ -75,7 +67,7 @@ def limpar_tela():
 
 
 
-def calcular_produto_final():
+def calcular_produto_final(): #calcula o o preço do produto final com base na quantidade de produtos brutos usados, o preço unitário de cada um e divide pela quantidade de produtos gerados
     produto_utilizado = str(input("Digite o produto usado: "))
     cur.execute("SELECT * FROM produtos WHERE nome = ?", (produto_utilizado,)) #zebra
     resultado_produto_utilizado = cur.fetchone()
@@ -108,18 +100,21 @@ def calcular_produto_final():
     con.commit()
 
 
-def adicionar_produtos_db():
+#Funções responsáveis por gerenciamento de produtos brutos:
+
+def adicionar_produtos_db(): #função responsável por adicionar o produto e o preço unitário no banco de dados e se o produto já existir, ele adiciona apenas a quantidade
     produto_add = str(input("Digite o nome do produto: ")).lower()
     quantidade_produtos_add = int(input("Digite a quantidade de produtos: "))
-    preco = float(input("Digite o preço unitário do produto: "))
-    preco_total = quantidade_produtos_add * preco
-
+    
 
     cur.execute('SELECT * FROM produtos WHERE nome = ?', (produto_add,))#zebra
     resultado = cur.fetchone()
     
 
     if not resultado:
+        preco = float(input("Digite o preço unitário do produto: "))
+        preco_total = quantidade_produtos_add * preco
+
         cur.execute("INSERT INTO produtos (nome, quantidade) VALUES (?, ?)", (produto_add, quantidade_produtos_add))
         produto_last_id = cur.lastrowid
         cur.execute("INSERT INTO financeiro (produto_id, preço_unitario, preço_total) VALUES (?, ?, ?)", (produto_last_id, preco, preco_total))
@@ -131,18 +126,23 @@ def adicionar_produtos_db():
         quantidade_atual = resultado[2]
         nova_quantidade = quantidade_atual + quantidade_produtos_add
         
-        cur.execute("SELECT preço_total FROM financeiro WHERE produto_id = ?", (produto_id,))#zebra
+        cur.execute("SELECT preço_total FROM financeiro WHERE produto_id = ?", (produto_id,))
         resultado2 = cur.fetchone()
         _=resultado2
+
+        cur.execute("SELECT preço_unitario FROM financeiro WHERE produto_id = ?", (produto_id,))
+        resultado_preco = cur.fetchone()
+        print(resultado_preco)
+
         cur.execute("UPDATE produtos SET quantidade = ? WHERE id = ?", (nova_quantidade, produto_id))
-        preco_atualizado = resultado2[0] + preco_total
+        preco_atualizado = resultado2[0] + (quantidade_produtos_add * resultado_preco[0])
         cur.execute("UPDATE financeiro SET preço_total = ? WHERE produto_id = ?", (preco_atualizado, produto_id,))
         con.commit()
         input("✅ Quantidade atualizada com sucesso. \nAperte Enter para continuar...")
 
 
 
-def remover_produtos_db():    
+def remover_produtos_db():   #função responsável por deletar o produto 
     produto_rmv = str(input("Digite o nome do produto: ")).lower().strip()
     cur.execute("SELECT * FROM produtos WHERE nome = ?", (produto_rmv,))#zebra
     resultado = cur.fetchone()
@@ -156,7 +156,7 @@ def remover_produtos_db():
         input("✅ Produto removido com sucesso. \nAperte Enter para continuar...")
 
 
-def remover_quantidade():
+def remover_quantidade(): #função responsável por cuidar da parte de "uso" dos produtos, caso tenha sido usado uma quantidade, ele deleta apenas a quantidade, se tudo tiver sido usado, deleta a quantidade e o produto do bd
     produto_rmv = str(input("Digite o nome do produto: ")).lower().strip()
     quantidade_rmv = int(input("Digite a quantidade: "))
     cur.execute("SELECT * FROM produtos WHERE nome = ?", (produto_rmv,))
@@ -182,28 +182,167 @@ def remover_quantidade():
 
 
 
-def listar_produtos_db(produto_db):
+def listar_produtos_db(produto_db): #lista um produto com base em pesquisa ou lista todos os produtos do banco
     cur.execute("SELECT * FROM produtos WHERE nome = ?", (produto_db,))#zebra
     resultado = cur.fetchall()
     if resultado:
         for produto in resultado:
-            print(f"Nome: {produto[1]}, Quantidade: {produto[2]}")
+            print(f"Nome: {produto[1]:<15}  Quantidade: {produto[2]:<10}")
     else:
         print("❌ Produto não encontrado.")
+
+
+#Funções responsáveis pela administração de capital:
+
+def adicionar_receita_fluxo(): #recebe as receitas
+    nome_receita = str(input('Nome: ')).lower().strip()
+    valor_receita = float(input('Valor: '))
+    cur.execute('SELECT * FROM controle_de_receita WHERE receitas = ?', (nome_receita,))
+    existe_receita = cur.fetchone()
+    if not existe_receita:
+        cur.execute("INSERT INTO controle_de_receita (receitas, preço_receitas) VALUES (?, ?)", (nome_receita, valor_receita,))
+        con.commit()
+        input("Receita adicionada com sucesso ✅")
+    #Se já houver uma receita adiciona o valor digitado ao valor existente da própria receita
+    else:
+        atualizar_valor_despesa = existe_receita[1] + valor_receita
+        cur.execute('UPDATE controle_de_receita SET preço_receitas = ? WHERE receitas = ?', (atualizar_valor_despesa, nome_receita,))
+        con.commit()
+        input('Valor da receita atualizado com sucesso ✅')
+
+
+def remover_receita_fluxo():
+    nome_receita_remover = input(str("Digite o nome da receita que você deseja remover: ")).lower().strip()
+    cur.execute("SELECT * FROM controle_de_receita WHERE receitas = ?", (nome_receita_remover,))
+    controle_de_erro_remover_receita = cur.fetchall()
+    if controle_de_erro_remover_receita:
+        cur.execute("DELETE FROM controle_de_receita WHERE receitas = ?", (nome_receita_remover,))
+        input("Receita excluída com sucesso ✅")
+        con.commit()
+    else: 
+        input("Receita não encontrada ❌. Tente novamente...")
+
+
+
+def adicionar_despesa_fluxo(): #recebe as despesas
+    nome_despesa = str(input("Nome: ")).lower().strip()
+    valor_despesa = float(input("Valor: "))
+    cur.execute('SELECT * FROM controle_de_despesas')
+    existe_despesa = cur.fetchone()
+    if not existe_despesa:
+        cur.execute("INSERT INTO controle_de_despesas (despesas, preço_despesas) VALUES (?, ?)", (nome_despesa, valor_despesa,))
+        con.commit()
+        input("Despesa adicionada com sucesso ✅")
+    #Se já houver uma receita adiciona o valor digitado ao valor existente da própria receita
+    else:
+        atualizar_valor_despesa = existe_despesa[1] + valor_despesa
+        cur.execute('UPDATE controle_de_despesas SET preço_despesas = ? WHERE despesas = ?', (atualizar_valor_despesa, nome_despesa,))
+        con.commit()
+        input('Valor da despesa atualizado com sucesso ✅')
+
+
+
+def remover_despesa_fluxo():
+    nome_despesa_remover = input(str("Digite o nome da despesa que você deseja remover: ")).lower().strip()
+    cur.execute("SELECT * FROM controle_de_despesas WHERE despesas = ?", (nome_despesa_remover,))
+    controle_de_erro_remover_despesa = cur.fetchall()
+    if controle_de_erro_remover_despesa:
+        cur.execute("DELETE FROM controle_de_despesas WHERE despesas = ?", (nome_despesa_remover,))
+        input("Despesa excluída com sucesso ✅")
+        con.commit()
+    else: 
+        input("Despesa não encontrada ❌. Tente novamente...")
+
+
+
+def calcular_receita(): #calcula o total de receitas - o total de despesas
+    lista_receita_total = []
+    lista_despesa_total = []
+    cur.execute("SELECT preço_receitas FROM controle_de_receita")
+    total_receita = cur.fetchall()
+    cur.execute("SELECT preço_despesas FROM controle_de_despesas")
+    total_despesa = cur.fetchall()
+    if total_receita:
+        for receita in total_receita:
+            lista_receita_total.append(receita[0])
+        for despesa in total_despesa:
+            lista_despesa_total.append(despesa[0])
+    calculo_total_receita = sum(lista_receita_total) - sum(lista_despesa_total)
+
+    print(f"O capital restante é: >>{calculo_total_receita}<<")
+    
+
+def verificar_fluxo(): # procura as despesas e receitas e as exibe em ordem.
+    limpar_tela()
+    cur.execute("SELECT * FROM controle_de_receita")
+    resultado_receita = cur.fetchall()
+    cur.execute("SELECT * FROM controle_de_despesas")
+    resultado_despesa = cur.fetchall()
+    
+    if resultado_receita and resultado_despesa:
+        for receita in resultado_receita:
+            print(f"Receita: {receita[0]:<15} Valor: {receita[1]:<10}")
+        for despesa in resultado_despesa:
+            print(f"Despesa: {despesa[0]:<15} Valor: {despesa[1]:<10}")
+        calcular_receita()
+        input("\nPressione enter para continuar... ")
+    
+    elif resultado_receita and not resultado_despesa:
+        for receita in resultado_receita:
+            print(f"Receita: {receita[0]:<15} Valor: {receita[1]:<10}")
+        input("\nPressione enter para continuar... ")
+
+    elif not resultado_receita and resultado_despesa:
+        for despesa in resultado_despesa:
+            print(f"Despesa: {despesa[0]:<15} Valor: {despesa[1]:<10}")
+        input("\nPressione enter para continuar... ")
+
+    else:
+        limpar_tela()
+        input("Não há registro de despesas ou receitas. \nPressione enter para continuar...")
+    
+
+
+
+def apagar_fluxo(): #apaga todas as receitas e despesas
+    limpar_tela()
+    cur.execute('SELECT * from controle_de_despesas')
+    resultado_existe_despesas = cur.fetchall()
+    cur.execute('SELECT * from controle_de_receita')
+    resultado_existe_receitas = cur.fetchall() 
+
+    if resultado_existe_despesas and resultado_existe_receitas:
+        cur.execute('DELETE FROM controle_de_despesas')
+        cur.execute('DELETE FROM controle_de_receita')
+        input('Tudo foi removido ✅')
+    elif resultado_existe_receitas and not resultado_existe_despesas:
+        cur.execute('DELETE FROM controle_de_receita')
+        input('Receitas excluídas. Não há despesas a serem excluídas.')
+    elif resultado_existe_despesas and not resultado_existe_receitas:
+        cur.execute('DELETE FROM controle_de_despesas')
+        input('Despesas excluídas. Não há receitas a serem excluídas.')
+    else:
+        input('Não há nada a ser apagado. ')
+    con.commit()
+
+
 while True:
     escolha_uma_opcao()
-    escolhaMenu = int(input(' 1 - Gerenciar produto final \n 2 - Gerenciar produtos brutos \n 3 - Relatórios \n 4 - Controle de finanças \n 5 - sair '))
-    if escolhaMenu == 1:
+    #menu Principal
+    escolhaMenu = int(input(' 1 - Gerenciar produto final \n 2 - Gerenciar produtos brutos \n 3 - Relatórios \n 4 - Controle de finanças \n 5 - sair ')) 
+    if escolhaMenu == 1: # parte responsável pelo gerenciamento do produto final
         limpar_tela()
         escolha_uma_opcao()
         calcular_produto_final()
-    elif escolhaMenu == 2:
+    elif escolhaMenu == 2: # parte responsável pelo gerenciamento dos produtos brutos
         limpar_tela()
+        
+        #menu de gerenciamento produtos brutos
         while True:
             escolha_uma_opcao()
             escolhaMenu2 = int(input(' 1 - Adicionar produto \n 2 - Remover produtos \n 3 - Ver produtos\n 4 - Sair do programa\n→ '))
-
-            if escolhaMenu2 == 1:
+            if escolhaMenu2 == 1: 
+            # opção responsável por adicionar produtos brutos ao bd
                 while True:
                     limpar_tela()
                     escolha_uma_opcao()
@@ -214,8 +353,8 @@ while True:
                     elif opcao_escolha1 == 2:
                         limpar_tela()
                         break
-
             elif escolhaMenu2 == 2:
+                # opção responsável por remover produtos ou quantidades
                 while True:
                     limpar_tela()
                     escolha_uma_opcao()
@@ -229,8 +368,8 @@ while True:
                     elif escolha_rmv == 3:
                         limpar_tela()
                         break
-
             elif escolhaMenu2 == 3:
+                # opção responsável por listar os produtos existentes
                 while True:
                     limpar_tela()
                     escolha_uma_opcao()
@@ -245,23 +384,59 @@ while True:
                         cur.execute("SELECT * FROM produtos")#zebra
                         produtos = cur.fetchall()
                         for produto in produtos:
-                            print(f"Nome: {produto[1]}, Quantidade: {produto[2]}")
+                            print(f"Nome: {produto[1]:<15} Quantidade: {produto[2]:<10}")
                         input("\nAperte Enter para continuar...")
                     elif opcao_escolha3 == 3:
                         limpar_tela()
                         break
-                    elif opcao_escolha3 == 4:
-                        exemplo1 = str(input('Digite a tabela que você deseja procurar: '))
-                        exemplo = str(input('Digite o nome que deseja procurar: '))
-                        funcao_select(exemplo1, exemplo, c=False, d=False, e=False)
-
             elif escolhaMenu2 == 4:
+                # encerra o menu de produtos brutos
                 limpar_tela()
                 break
-    if escolhaMenu == 4:
+    elif escolhaMenu == 4:
+        while True:
+            limpar_tela()
+            #menu
+            escolha_uma_opcao()
+            print(f""" 1 - Adicionar receita \n 2 - Adicionar despesa \n 3 - Verificar Fluxo \n 4 - Remover Despesa/Receita \n 5 - Sair \n """)
+            opcao = int(input('Digite a opção:\n'))
+            #adicionar receita
+            if opcao == 1:
+                limpar_tela()
+                adicionar_receita_fluxo()
+            #adicionar despesa
+            elif opcao == 2:
+                limpar_tela()
+                adicionar_despesa_fluxo()
+            #verificar fluxo
+            elif opcao == 3:
+                verificar_fluxo()
+            #interromper menu
+            elif opcao == 4:
+                while True:
+                    limpar_tela()
+                    escolha_uma_opcao()
+                    opcao_menu_remover = int(input("1 - Remover Receita \n2 - Remover Despesa \n3 - Remover tudo \n4 - Voltar \n"))
+                    if opcao_menu_remover == 1:
+                        limpar_tela()
+                        remover_receita_fluxo()
+                    elif opcao_menu_remover == 2:
+                        limpar_tela()
+                        remover_despesa_fluxo()
+                    elif opcao_menu_remover == 3:
+                        apagar_fluxo()
+                    elif opcao_menu_remover == 4:
+                        break
+                    else: input("Digite uma opção válida.") 
+            elif opcao == 5:
+                limpar_tela()
+                break
+            #caso digite uma opção inválida
+            else:
+                print('Opção inválida, digite uma opção válida.')
+    elif escolhaMenu == 5: # encerra o programa
         limpar_tela()
         print("👋 Saindo do programa...")
         break
-con.commit()
-con.close()
-
+con.commit() #salva todas as alterações
+con.close() #fecha o bd
