@@ -1,5 +1,6 @@
 #criar o esquema de orientação a objetos, dividir o código em funções e menu
 #Criar menu de gerenciamento de produto final
+#Consertar o bug das opções do menu de produtos finais e consertar o fato de ser usado só um ingrediente.
 
 import sqlite3
 from os import system, name
@@ -65,44 +66,109 @@ def limpar_tela(): #é responsável por limpar a tela dps de uma interação com
 
 #def definir_preco_total():
 
-
+#funções responsáveis pelo produto final
 
 def calcular_produto_final(): #calcula o o preço do produto final com base na quantidade de produtos brutos usados, o preço unitário de cada um e divide pela quantidade de produtos gerados
-    produto_utilizado = str(input("Digite o produto usado: "))
-    cur.execute("SELECT * FROM produtos WHERE nome = ?", (produto_utilizado,)) #zebra
-    resultado_produto_utilizado = cur.fetchone()
-    
-    if not resultado_produto_utilizado:
-        input(f"{produto_utilizado} não encontrado no banco de dados, tente novamente.") 
-        limpar_tela()
-    else:
-        input(resultado_produto_utilizado)
-        id_produto_utilizado = resultado_produto_utilizado[0]
-        quantidade_produtos_utilizado = resultado_produto_utilizado[2]
+    quantidade_produtos_usados = int(input('Quantos ingredientes foram usados para fazer o produto final?'))
+    for i in range(quantidade_produtos_usados):        
+        produto_utilizado = str(input("Digite o nome do produto usado: "))
+        cur.execute("SELECT * FROM produtos WHERE nome = ?", (produto_utilizado,)) #zebra
+        resultado_produto_utilizado = cur.fetchone()
         
-        cur.execute("SELECT * FROM financeiro WHERE produto_id = ?", (id_produto_utilizado,)) #zebra
-        resultado_financeiro_id = cur.fetchone()
-        preco_produto_utilizado = resultado_financeiro_id[1]
-
-        quantidade_produtos = int(input(f"Digite a quantidade de {produto_utilizado} utilizada"))
-        nova_quantidade_produto_utilizado = quantidade_produtos_utilizado - quantidade_produtos
-        if nova_quantidade_produto_utilizado < 0:
-            input("Quantidade maior do que a existente no banco de dados. Tente novamente.")
+        if not resultado_produto_utilizado:
+            input(f"{produto_utilizado} não encontrado no banco de dados, tente novamente.") 
+            limpar_tela()
         else:
-            produto_final = str(input("Digite o nome do produto que foi criado: "))
-            quantidade_produtos_finais = int(input("Digite a quantidade de produtos finais gerados: "))
-            preco_final = quantidade_produtos * preco_produto_utilizado / quantidade_produtos_finais
-            cur.execute("INSERT INTO produto_final (nome_produto_final, quantidade, preço) VALUES (?, ?, ?)", (produto_final, quantidade_produtos_finais, preco_final,))  
-            if nova_quantidade_produto_utilizado <= 0:
-                cur.execute("DELETE FROM produtos WHERE nome = ?", (produto_utilizado,))
+            input(resultado_produto_utilizado)
+            id_produto_utilizado = resultado_produto_utilizado[0]
+            quantidade_produtos_utilizado = resultado_produto_utilizado[2]
+            
+            cur.execute("SELECT * FROM financeiro WHERE produto_id = ?", (id_produto_utilizado,)) #zebra
+            resultado_financeiro_id = cur.fetchone()
+            preco_produto_utilizado = resultado_financeiro_id[1]
+
+            quantidade_produtos = int(input(f"Digite a quantidade de {produto_utilizado} utilizada"))
+            nova_quantidade_produto_utilizado = quantidade_produtos_utilizado - quantidade_produtos
+            if nova_quantidade_produto_utilizado < 0:
+                input("Quantidade maior do que a existente no banco de dados. Tente novamente.")
             else:
-                cur.execute("UPDATE produtos SET quantidade = ? WHERE id = ?", (id_produto_utilizado, nova_quantidade_produto_utilizado,))
+                produto_final = str(input("Digite o nome do produto que foi criado: "))
+                quantidade_produtos_finais = int(input("Digite a quantidade de produtos finais gerados: "))
+                preco_final = quantidade_produtos * preco_produto_utilizado / quantidade_produtos_finais
+                cur.execute("INSERT INTO produto_final (nome_produto_final, quantidade, preço) VALUES (?, ?, ?)", (produto_final, quantidade_produtos_finais, preco_final,))  
+                if nova_quantidade_produto_utilizado <= 0:
+                    cur.execute("DELETE FROM produtos WHERE nome = ?", (produto_utilizado,))
+                else:
+                    cur.execute("UPDATE produtos SET quantidade = ? WHERE id = ?", (id_produto_utilizado, nova_quantidade_produto_utilizado,))
     con.commit()
+
+
+
+def remover_produtos_finais():
+    produto_final_rmv = str(input("Digite o nome do produto: ")).lower().strip()
+    cur.execute("SELECT * FROM produto_final WHERE nome_produto_final = ?", (produto_final_rmv,))
+    resultado_prod_final = cur.fetchone()
+    if not resultado_prod_final:
+        input("Produto não encontrado, tente novamente.")
+    else:
+        cur.execute("DELETE FROM produto_final WHERE nome_produto_final = ?", (produto_final_rmv,))
+        con.commit()
+        input("✅ Produto removido com sucesso. \nAperte Enter para continuar...")
+
+
+def remover_quantidade_produto_final():
+    produto_final_rmv = str(input("Digite o nome do produto: ")).lower().strip()
+    quantidade_final_rmv = int(input("Digite a quantidade: "))
+    cur.execute("SELECT * FROM produto_final WHERE nome_produto_final = ?", (produto_final_rmv,))
+    resultado = cur.fetchone()
+    id_produto_rmv_quantidade = resultado[0]
+    if not resultado:
+        input("Produto não encontrado, tente novamente.")
+    else:
+        quantidade_produto = resultado[2]
+        nova_quantidade_produto = quantidade_produto - quantidade_final_rmv
+
+        if nova_quantidade_produto < 0:
+            input("A quantidade digitada é maior do que a disponível em estoque. Tente novamente.")
+        else:
+            cur.execute("UPDATE produto_final SET quantidade = ? WHERE produto_final_id = ?", (nova_quantidade_produto, id_produto_rmv_quantidade))
+            print(f"A quantidade de {produto_final_rmv} foi alterada com sucesso! ✅")
+            input("Aperte enter para continuar...")
+
+        if nova_quantidade_produto == 0:
+            cur.execute("DELETE FROM produtos WHERE nome = ?", (produto_final_rmv,))
+            cur.execute("DELETE FROM financeiro WHERE produto_id = ?", (id_produto_rmv_quantidade,))
+
+
+
+def listar_produto_final():
+    nome_produto_final_listar = str(input('Digite o nome do produto: '))
+    cur.execute('SELECT * FROM produto_final WHERE nome_produto_final = ?', (nome_produto_final_listar,))
+    produto_final_listado = cur.fetchone()
+    if produto_final_listado:
+        print(f'Produto: {produto_final_listado[1]:<15}  Quantidade: {produto_final_listado[2]:<10} Preço: {produto_final_listado[3]:<5}')
+        input('Pressione enter para continuar...')
+    else:
+        input('Produto não encontrado ❌')
+
+
+
+def listar_todos_produtos_finais():
+    cur.execute('SELECT * FROM produto_final')
+    resultado_todos_finais = cur.fetchall()
+    if resultado_todos_finais:
+        for resultado in resultado_todos_finais:
+            print(f'Produto: {resultado[1]:<15}  Quantidade: {resultado[2]:<10}  Preço: {resultado[3]}')
+        input('Pressione enter para continuar...')
+    else:
+        input('Nenhum produto encontrado ❌')
+        
+
 
 
 #Funções responsáveis por gerenciamento de produtos brutos:
 
-def adicionar_produtos_db(): #função responsável por adicionar o produto e o preço unitário no banco de dados e se o produto já existir, ele adiciona apenas a quantidade
+def adicionar_produtos_db(): #função responsável por adicionar o produto e o preço unitário no banco de dados e se o produto já existir, ele adiciona apenas a quantidade()
     produto_add = str(input("Digite o nome do produto: ")).lower()
     quantidade_produtos_add = int(input("Digite a quantidade de produtos: "))
     
@@ -156,7 +222,7 @@ def remover_produtos_db():   #função responsável por deletar o produto
         input("✅ Produto removido com sucesso. \nAperte Enter para continuar...")
 
 
-def remover_quantidade(): #função responsável por cuidar da parte de "uso" dos produtos, caso tenha sido usado uma quantidade, ele deleta apenas a quantidade, se tudo tiver sido usado, deleta a quantidade e o produto do bd
+def remover_quantidade_produto_bruto(): #função responsável por cuidar da parte de "uso" dos produtos, caso tenha sido usado uma quantidade, ele deleta apenas a quantidade, se tudo tiver sido usado, deleta a quantidade e o produto do bd
     produto_rmv = str(input("Digite o nome do produto: ")).lower().strip()
     quantidade_rmv = int(input("Digite a quantidade: "))
     cur.execute("SELECT * FROM produtos WHERE nome = ?", (produto_rmv,))
@@ -331,17 +397,44 @@ while True:
     #menu Principal
     escolhaMenu = int(input(' 1 - Gerenciar produto final \n 2 - Gerenciar produtos brutos \n 3 - Relatórios \n 4 - Controle de finanças \n 5 - sair ')) 
     if escolhaMenu == 1: # parte responsável pelo gerenciamento do produto final
-        limpar_tela()
-        escolha_uma_opcao()
-        calcular_produto_final()
+        while True:
+            limpar_tela()
+            escolha_uma_opcao()
+            escolha_menu_produto_final = int(input(' 1 - Adicionar produto final \n 2 - Remover produtos finais \n 3 - Ver produtos finais \n 4 - Voltar \n→ '))
+            if escolha_menu_produto_final == 1:
+                limpar_tela()
+                calcular_produto_final()
+            elif escolha_menu_produto_final == 2:
+                limpar_tela()
+                escolha_uma_opcao()
+                #menu de remover produto final ou a quantidade
+                escolha_remover_final = int(input(' 1 - Remover quantidades do produto \n 2 - Remover produtos \n 3 - Voltar \n → '))
+                if escolha_remover_final == 1:
+                    limpar_tela()
+                    remover_quantidade_produto_final()
+                elif escolha_remover_final == 2:
+                    limpar_tela()
+                    remover_produtos_finais()
+                elif escolha_remover_final == 3:
+                    limpar_tela()
+                    break
+            elif escolha_menu_produto_final == 3:
+                limpar_tela()
+                listar_produto_final()
+            elif escolha_menu_produto_final == 4:
+                limpar_tela()
+                break
+            else:
+                input('Opção inválida, tente novamente.')
+
     elif escolhaMenu == 2: # parte responsável pelo gerenciamento dos produtos brutos
         limpar_tela()
         
         #menu de gerenciamento produtos brutos
         while True:
             escolha_uma_opcao()
-            escolhaMenu2 = int(input(' 1 - Adicionar produto \n 2 - Remover produtos \n 3 - Ver produtos\n 4 - Sair do programa\n→ '))
-            if escolhaMenu2 == 1: 
+            escolha_menu_produto_bruto = int(input(' 1 - Adicionar produto \n 2 - Remover produtos \n 3 - Ver produtos\n 4 - Voltar\n→ '))
+            if escolha_menu_produto_bruto == 1: 
             # opção responsável por adicionar produtos brutos ao bd
                 while True:
                     limpar_tela()
@@ -353,7 +446,7 @@ while True:
                     elif opcao_escolha1 == 2:
                         limpar_tela()
                         break
-            elif escolhaMenu2 == 2:
+            elif escolha_menu_produto_bruto == 2:
                 # opção responsável por remover produtos ou quantidades
                 while True:
                     limpar_tela()
@@ -363,12 +456,12 @@ while True:
                         limpar_tela()
                         remover_produtos_db()
                     elif escolha_rmv == 2:
-                        remover_quantidade()
+                        remover_quantidade_produto_bruto()
                         limpar_tela()
                     elif escolha_rmv == 3:
                         limpar_tela()
                         break
-            elif escolhaMenu2 == 3:
+            elif escolha_menu_produto_bruto == 3:
                 # opção responsável por listar os produtos existentes
                 while True:
                     limpar_tela()
@@ -389,7 +482,7 @@ while True:
                     elif opcao_escolha3 == 3:
                         limpar_tela()
                         break
-            elif escolhaMenu2 == 4:
+            elif escolha_menu_produto_bruto == 4:
                 # encerra o menu de produtos brutos
                 limpar_tela()
                 break
@@ -399,20 +492,20 @@ while True:
             #menu
             escolha_uma_opcao()
             print(f""" 1 - Adicionar receita \n 2 - Adicionar despesa \n 3 - Verificar Fluxo \n 4 - Remover Despesa/Receita \n 5 - Sair \n """)
-            opcao = int(input('Digite a opção:\n'))
+            escolha_menu_fluxo = int(input('Digite a opção:\n'))
             #adicionar receita
-            if opcao == 1:
+            if escolha_menu_fluxo == 1:
                 limpar_tela()
                 adicionar_receita_fluxo()
             #adicionar despesa
-            elif opcao == 2:
+            elif escolha_menu_fluxo == 2:
                 limpar_tela()
                 adicionar_despesa_fluxo()
             #verificar fluxo
-            elif opcao == 3:
+            elif escolha_menu_fluxo == 3:
                 verificar_fluxo()
             #interromper menu
-            elif opcao == 4:
+            elif escolha_menu_fluxo == 4:
                 while True:
                     limpar_tela()
                     escolha_uma_opcao()
@@ -428,7 +521,7 @@ while True:
                     elif opcao_menu_remover == 4:
                         break
                     else: input("Digite uma opção válida.") 
-            elif opcao == 5:
+            elif escolha_menu_fluxo == 5:
                 limpar_tela()
                 break
             #caso digite uma opção inválida
